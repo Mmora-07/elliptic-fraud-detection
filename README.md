@@ -1,51 +1,44 @@
-# 🛡️ Detección de Anomalías Financieras en Bitcoin usando Autoencoders
+# 🪙 Detección de Transacciones Ilícitas en Bitcoin: Evaluación de Autoencoders Tabulares vs. Graph Convolutional Networks (GCN)
 
-Este repositorio contiene la implementación e investigación de un enfoque no supervisado para la **detección de transacciones fraudulentas e ilícitas** sobre la red de Bitcoin, utilizando la arquitectura de **Autoencoders Densos** sobre el *Elliptic Bitcoin Dataset*.
+Este repositorio alberga la investigación e implementación de modelos de aprendizaje automático para la detección de transacciones fraudulentas e ilícitas en la red Bitcoin, utilizando el **Elliptic Bitcoin Dataset**.
 
----
-
-## 📌 Planteamiento del Problema
-
-En los sistemas financieros, la detección de fraude enfrenta dos obstáculos críticos: el **extremo desbalance de clases** (<2% de transacciones anómalas) y la constante evolución de las tácticas delictivas. 
-
-Bajo la **Hipótesis de la Variedad (Manifold Hypothesis)**, se asume que las transacciones lícitas yacen cerca de una subvariedad de menor dimensión en el espacio de características. Un **Autoencoder** entrenado *exclusivamente* con comportamiento lícito aprenderá a reconstruir este espacio. Por ende, cualquier transacción anómala o fraudulenta presentará una distorsión significativa al ser reconstruida, resultando en un **Error Cuadrático Medio ($\mathcal{L}_{\text{MSE}}$) elevado**.
+El proyecto contrasta un enfoque **no supervisado basado en anomalías tabulares (Autoencoder)** frente a un enfoque de **aprendizaje profundo en grafos (Graph Convolutional Network - GCN)** que incorpora explícitamente la topología de la red de transacciones.
 
 ---
 
-## 📐 Fundamentación Matemática
+## 📌 Resumen del Proyecto
 
-### 1. Codificación y Decodificación
-Dada una transacción $x \in \mathbb{R}^d$ ($d=166$ atributos), el codificador la proyecta a una representación latente restringida $z \in \mathbb{R}^k$ ($k \ll d$):
-
-$$z = f_\theta(x) = \sigma(W_e x + b_e)$$
-
-Posteriormente, el decodificador intenta reconstruir la señal original a partir de $z$:
-
-$$\hat{x} = g_\phi(z) = \sigma(W_d z + b_d)$$
-
-### 2. Función de Pérdida (MSE)
-La red optimiza los parámetros $\{\theta, \phi\}$ minimizando el error de reconstrucción sobre el conjunto de entrenamiento lícito:
-
-$$\mathcal{L}_{\text{MSE}}(x, \hat{x}) = \frac{1}{d} \sum_{j=1}^{d} (x_j - \hat{x}_j)^2$$
-
-### 3. Regla de Decisión y Score de Anomalía
-Se define la score de anomalía $S(x) = \mathcal{L}_{\text{MSE}}(x, \hat{x})$. La clasificación binaria de la transacción se realiza comparando contra un umbral crítico $\tau$:
-
-$$\hat{y} = \begin{cases} 1 \quad (\text{Fraude}), & \text{si } S(x) > \tau \\ 0 \quad (\text{Lícito}), & \text{si } S(x) \le \tau \end{cases}$$
+* **Dataset:** Elliptic Bitcoin Dataset (203,769 nodos/transacciones, 234,355 aristas/flujos, 166 características numéricas).
+* **Problema:** Alto desbalance de clases (las transacciones ilícitas representan aproximadamente el 10% de los datos etiquetados) y un marcado cambio temporal de la distribución (*covariate shift*).
+* **Línea Base (Fase 1):** Autoencoder entrenado exclusivamente con transacciones lícitas (`class2`) para medir anomalías mediante el Error Cuadrático Medio de Reconstrucción ($\mathcal{L}_{\text{MSE}}$).
+* **Modelo Avanzado (Fase 2 - Rama `feature/gnn-gcn`):** Red Neuronal Convolucional para Grafos (GCN) semisupervisada construida con `PyTorch Geometric`, combinando atributos de transacción con la matriz de adyacencia del grafo.
 
 ---
 
-## 📂 Estructura del Repositorio
+## 📁 Estructura del Repositorio
 
 ```text
 elliptic-fraud-detection/
-├── data/                       <-- Almacenamiento local de datos (Raw / Processed)
-├── notebooks/                  <-- Exploración y entrenamiento interactivo
+├── data/
+│   ├── raw/                        # Datasets crudos de Elliptic (.csv)
+│   │   ├── elliptic_txs_classes.csv
+│   │   ├── elliptic_txs_edgelist.csv
+│   │   └── elliptic_txs_features.csv
+│   └── processed/                  # Matrices procesadas, scalers y arrays NumPy
+├── models/                         # Pesos guardados (.pth) y configuraciones (.joblib)
+│   ├── autoencoder_licit.pth
+│   ├── gcn_elliptic.pth
+│   └── threshold_config.joblib
+├── notebooks/
 │   ├── 01_eda_and_preprocessing.ipynb
-│   └── 02_autoencoder_training.ipynb
-├── src/                        <-- Módulos ejecutables en Python
-│   ├── data_loader.py          <-- Carga, filtrado y escalado
-│   └── model.py                <-- Arquitectura PyTorch del Autoencoder
+│   ├── 02_autoencoder_training.ipynb
+│   ├── 03_evaluation_and_threshold.ipynb
+│   └── 04_gcn_training_and_evaluation.ipynb
+├── src/                            # Módulos Python reutilizables
+│   ├── __init__.py
+│   ├── model.py                    # Arquitectura PyTorch del Autoencoder Tabular
+│   ├── gnn_model.py                # Arquitectura GCN (PyTorch Geometric)
+│   └── graph_dataset.py            # Loader y constructor del grafo PyG
 ├── .gitignore
-├── requirements.txt
-└── README.md
+├── README.md
+└── requirements.txt
