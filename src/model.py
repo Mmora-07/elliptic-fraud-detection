@@ -1,47 +1,59 @@
 import torch
 import torch.nn as nn
 
+
 class Autoencoder(nn.Module):
     """
     Arquitectura Autoencoder para Reducción Dimensional y Detección de Anomalías.
     Estructura simétrica de compresión (Encoder) y reconstrucción (Decoder).
     """
-    def __init__(self, input_dim: int = 165, bottleneck_dim: int = 16, dropout_rate: float = 0.1):
+
+    def __init__(
+        self,
+        input_dim: int = 165,
+        bottleneck_dim: int = 16,
+        dropout_rate: float = 0.1,
+        hidden_dims: tuple | list | None = None,
+    ):
         super(Autoencoder, self).__init__()
-        
-        # --- ENCODER ---
-        # Reduce la dimensionalidad: 165 -> 64 -> 32 -> bottleneck_dim (16)
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 64),
-            nn.BatchNorm1d(64),
-            nn.LeakyReLU(0.2),
-            nn.Dropout(dropout_rate),
-            
-            nn.Linear(64, 32),
-            nn.BatchNorm1d(32),
-            nn.LeakyReLU(0.2),
-            nn.Dropout(dropout_rate),
-            
-            nn.Linear(32, bottleneck_dim),
-            nn.LeakyReLU(0.2)
-        )
-        
-        # --- DECODER ---
-        # Reconstruye la dimensión original: bottleneck_dim (16) -> 32 -> 64 -> 165
-        self.decoder = nn.Sequential(
-            nn.Linear(bottleneck_dim, 32),
-            nn.BatchNorm1d(32),
-            nn.LeakyReLU(0.2),
-            nn.Dropout(dropout_rate),
-            
-            nn.Linear(32, 64),
-            nn.BatchNorm1d(64),
-            nn.LeakyReLU(0.2),
-            nn.Dropout(dropout_rate),
-            
-            nn.Linear(64, input_dim)
-            # Sin activación final al trabajar con variables estandarizadas (Z-score)
-        )
+
+        if hidden_dims is None:
+            hidden_dims = (64, 32)
+        hidden_dims = list(hidden_dims)
+
+        encoder_layers = []
+        prev_dim = input_dim
+        for hidden_dim in hidden_dims:
+            encoder_layers.extend(
+                [
+                    nn.Linear(prev_dim, hidden_dim),
+                    nn.BatchNorm1d(hidden_dim),
+                    nn.LeakyReLU(0.2),
+                ]
+            )
+            if dropout_rate > 0:
+                encoder_layers.append(nn.Dropout(dropout_rate))
+            prev_dim = hidden_dim
+
+        encoder_layers.extend([nn.Linear(prev_dim, bottleneck_dim), nn.LeakyReLU(0.2)])
+        self.encoder = nn.Sequential(*encoder_layers)
+
+        decoder_layers = []
+        prev_dim = bottleneck_dim
+        for hidden_dim in reversed(hidden_dims):
+            decoder_layers.extend(
+                [
+                    nn.Linear(prev_dim, hidden_dim),
+                    nn.BatchNorm1d(hidden_dim),
+                    nn.LeakyReLU(0.2),
+                ]
+            )
+            if dropout_rate > 0:
+                decoder_layers.append(nn.Dropout(dropout_rate))
+            prev_dim = hidden_dim
+
+        decoder_layers.append(nn.Linear(prev_dim, input_dim))
+        self.decoder = nn.Sequential(*decoder_layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         latent = self.encoder(x)
