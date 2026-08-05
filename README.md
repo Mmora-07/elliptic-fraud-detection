@@ -43,14 +43,26 @@ $$\mathcal{L}_{\text{MSE}}(\mathbf{x}, \hat{\mathbf{x}}) = \frac{1}{d} \sum_{i=1
    - Guarda el checkpoint en `models/autoencoder_creditcard.pth`.
 
 3. **Evaluación y Umbral** (`notebooks/03_evaluation_and_threshold.ipynb`):
-   - Carga `X_val.npy`, `X_test.npy`, `y_val.npy`, `y_test.npy` y `scaler.joblib`.
+   - Carga `X_val.npy`, `X_test.npy`, `y_val.npy`, `y_test.npy`.
    - Carga el checkpoint `models/autoencoder_creditcard.pth`.
    - Calcula errores de reconstrucción y selecciona el umbral óptimo por `F1` en validación.
    - Evalúa la detección en el conjunto de prueba y guarda métricas y artefactos.
 
 ---
 
-## 📌 4. Archivos Clave
+## 📌 4. Arquitectura del Modelo
+
+El modelo `src/model.py` es un Autoencoder simétrico entrenado sobre las 30 características del dataset procesado:
+
+- Entrada: 30 features (`V1` a `V28`, `scaled_amount`, `scaled_time`)
+- Encoder: `30 -> 64 -> 32 -> 14`
+- Decoder: `14 -> 32 -> 64 -> 30`
+- Capas intermedias con `BatchNorm1d`, `LeakyReLU(0.2)` y `Dropout(0.1)`.
+- La pérdida de entrenamiento es `MSELoss` sobre la reconstrucción de las características escaladas.
+
+El notebook `02_autoencoder_training.ipynb` determina dinámicamente `INPUT_DIM` a partir de los datos cargados, por lo que el valor real usado en el entrenamiento corresponde al número de columnas procesadas.
+
+## 📌 5. Archivos Clave
 
 - `data/processed/X_train_licit.npy` — Entrenamiento exclusivo con transacciones normales.
 - `data/processed/X_val.npy`, `data/processed/y_val.npy` — Validación para selección de umbral.
@@ -60,7 +72,3 @@ $$\mathcal{L}_{\text{MSE}}(\mathbf{x}, \hat{\mathbf{x}}) = \frac{1}{d} \sum_{i=1
 - `data/processed/threshold_config.joblib` — Umbral óptimo y métricas almacenadas.
 
 ---
-
-## ✅ Nota
-
-Este proyecto ya no usa datos de Bitcoin ni del dataset Elliptic. Todo el flujo está adaptado al dataset de fraude con tarjeta de crédito `creditcard.csv`.
