@@ -1,61 +1,54 @@
 import torch
 import torch.nn as nn
 
-
 class Autoencoder(nn.Module):
     """
-    Arquitectura Autoencoder para Reducción Dimensional y Detección de Anomalías.
-    Estructura simétrica de compresión (Encoder) y reconstrucción (Decoder).
+    Autoencoder en PyTorch configurado para detección de anomalías/fraude
+    en el dataset Credit Card.
     """
-
-    def __init__(
-        self,
-        input_dim: int = 165,
-        bottleneck_dim: int = 16,
-        dropout_rate: float = 0.1,
-        hidden_dims: tuple | list | None = None,
-    ):
+    def __init__(self, input_dim: int = 29, bottleneck_dim: int = 14, dropout_rate: float = 0.1):
         super(Autoencoder, self).__init__()
-
-        if hidden_dims is None:
-            hidden_dims = (64, 32)
-        hidden_dims = list(hidden_dims)
-
-        encoder_layers = []
-        prev_dim = input_dim
-        for hidden_dim in hidden_dims:
-            encoder_layers.extend(
-                [
-                    nn.Linear(prev_dim, hidden_dim),
-                    nn.BatchNorm1d(hidden_dim),
-                    nn.LeakyReLU(0.2),
-                ]
-            )
-            if dropout_rate > 0:
-                encoder_layers.append(nn.Dropout(dropout_rate))
-            prev_dim = hidden_dim
-
-        encoder_layers.extend([nn.Linear(prev_dim, bottleneck_dim), nn.LeakyReLU(0.2)])
-        self.encoder = nn.Sequential(*encoder_layers)
-
-        decoder_layers = []
-        prev_dim = bottleneck_dim
-        for hidden_dim in reversed(hidden_dims):
-            decoder_layers.extend(
-                [
-                    nn.Linear(prev_dim, hidden_dim),
-                    nn.BatchNorm1d(hidden_dim),
-                    nn.LeakyReLU(0.2),
-                ]
-            )
-            if dropout_rate > 0:
-                decoder_layers.append(nn.Dropout(dropout_rate))
-            prev_dim = hidden_dim
-
-        decoder_layers.append(nn.Linear(prev_dim, input_dim))
-        self.decoder = nn.Sequential(*decoder_layers)
+        
+        # Encoder: compresión progresiva de características
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.BatchNorm1d(64),
+            nn.LeakyReLU(0.2),
+            nn.Dropout(dropout_rate),
+            
+            nn.Linear(64, 32),
+            nn.BatchNorm1d(32),
+            nn.LeakyReLU(0.2),
+            nn.Dropout(dropout_rate),
+            
+            nn.Linear(32, bottleneck_dim),
+            nn.LeakyReLU(0.2)
+        )
+        
+        # Decoder: reconstrucción del vector original
+        self.decoder = nn.Sequential(
+            nn.Linear(bottleneck_dim, 32),
+            nn.BatchNorm1d(32),
+            nn.LeakyReLU(0.2),
+            nn.Dropout(dropout_rate),
+            
+            nn.Linear(32, 64),
+            nn.BatchNorm1d(64),
+            nn.LeakyReLU(0.2),
+            nn.Dropout(dropout_rate),
+            
+            nn.Linear(64, input_dim)
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         latent = self.encoder(x)
         reconstructed = self.decoder(latent)
         return reconstructed
+
+    def encode(self, x: torch.Tensor) -> torch.Tensor:
+        """Obtiene la representación latente (bottleneck)."""
+        return self.encoder(x)
+
+    def decode(self, latent: torch.Tensor) -> torch.Tensor:
+        """Reconstruye la entrada a partir del vector latente."""
+        return self.decoder(latent)
