@@ -1,51 +1,38 @@
-# 🛡️ Detección de Anomalías Financieras en Bitcoin usando Autoencoders
+# 🛡️ Credit Card Fraud Detection with Autoencoders
 
-Este repositorio contiene la implementación e investigación de un enfoque no supervisado para la **detección de transacciones fraudulentas e ilícitas** sobre la red de Bitcoin, utilizando la arquitectura de **Autoencoders Densos** sobre el *Elliptic Bitcoin Dataset*.
-
----
-
-## 📌 Planteamiento del Problema
-
-En los sistemas financieros, la detección de fraude enfrenta dos obstáculos críticos: el **extremo desbalance de clases** (<2% de transacciones anómalas) y la constante evolución de las tácticas delictivas. 
-
-Bajo la **Hipótesis de la Variedad (Manifold Hypothesis)**, se asume que las transacciones lícitas yacen cerca de una subvariedad de menor dimensión en el espacio de características. Un **Autoencoder** entrenado *exclusivamente* con comportamiento lícito aprenderá a reconstruir este espacio. Por ende, cualquier transacción anómala o fraudulenta presentará una distorsión significativa al ser reconstruida, resultando en un **Error Cuadrático Medio ($\mathcal{L}_{\text{MSE}}$) elevado**.
+Pipeline de detección de anomalías basado en **Error de Reconstrucción ($\mathcal{L}_{\text{MSE}}$)** con **PyTorch** sobre el dataset `creditcard.csv`.
 
 ---
 
-## 📐 Fundamentación Matemática
+## 📌 1. Fundamento Teórico
 
-### 1. Codificación y Decodificación
-Dada una transacción $x \in \mathbb{R}^d$ ($d=166$ atributos), el codificador la proyecta a una representación latente restringida $z \in \mathbb{R}^k$ ($k \ll d$):
+1. **Desbalance Extremo**: Las transacciones fraudulentas representan apenas el ~0.17% del total, haciendo inviable un enfoque supervisado tradicional sin sesgos severos.
+2. **Hipótesis de la Variedad (Manifold Hypothesis)**: Las transacciones legítimas se concentran en un subespacio estadístico continuo. El Autoencoder se entrena **únicamente con datos normales** para memorizar la estructura de dicho subespacio.
+3. **Criterio de Anomalía**: Datos atípicos sufren una alta distorsión al ser reconstruidos desde el espacio latente. Una transacción se clasifica como fraude si supera un umbral $\tau$:
 
-$$z = f_\theta(x) = \sigma(W_e x + b_e)$$
-
-Posteriormente, el decodificador intenta reconstruir la señal original a partir de $z$:
-
-$$\hat{x} = g_\phi(z) = \sigma(W_d z + b_d)$$
-
-### 2. Función de Pérdida (MSE)
-La red optimiza los parámetros $\{\theta, \phi\}$ minimizando el error de reconstrucción sobre el conjunto de entrenamiento lícito:
-
-$$\mathcal{L}_{\text{MSE}}(x, \hat{x}) = \frac{1}{d} \sum_{j=1}^{d} (x_j - \hat{x}_j)^2$$
-
-### 3. Regla de Decisión y Score de Anomalía
-Se define la score de anomalía $S(x) = \mathcal{L}_{\text{MSE}}(x, \hat{x})$. La clasificación binaria de la transacción se realiza comparando contra un umbral crítico $\tau$:
-
-$$\hat{y} = \begin{cases} 1 \quad (\text{Fraude}), & \text{si } S(x) > \tau \\ 0 \quad (\text{Lícito}), & \text{si } S(x) \le \tau \end{cases}$$
+$$\mathcal{L}_{\text{MSE}}(\mathbf{x}, \mathbf{\hat{x}}) = \frac{1}{d} \sum_{i=1}^{d} (x_i - \hat{x}_i)^2 > \tau$$
 
 ---
 
-## 📂 Estructura del Repositorio
+## 🏗️ 2. Arquitectura de la Red
+
+Red simétrica modular definida en `src/model.py`:
 
 ```text
-elliptic-fraud-detection/
-├── data/                       <-- Almacenamiento local de datos (Raw / Processed)
-├── notebooks/                  <-- Exploración y entrenamiento interactivo
-│   ├── 01_eda_and_preprocessing.ipynb
-│   └── 02_autoencoder_training.ipynb
-├── src/                        <-- Módulos ejecutables en Python
-│   ├── data_loader.py          <-- Carga, filtrado y escalado
-│   └── model.py                <-- Arquitectura PyTorch del Autoencoder
-├── .gitignore
-├── requirements.txt
-└── README.md
+Entrada [d=29] ──► Encoder [16 ──► 8] ──► Bottleneck [z=4] ──► Decoder [8 ──► 16] ──► Reconstrucción [d=29]
+Capas: Transformaciones lineales con LeakyReLU(0.2) y BatchNorm1d.Bottleneck: Compresión en subespacio latente $z \in \mathbb{R}^4$.Loss & Optimizador: $\mathcal{L}_{\text{MSE}}$ optimizado con AdamW + ReduceLROnPlateau.
+📂 3. Estructura del Repositorio
+├── data/
+│   ├── raw/creditcard.csv             # Dataset original
+│   └── processed/                     # Sets particionados (train, val, test)
+├── notebooks/
+│   ├── 01_eda_and_preprocessing.ipynb # RobustScaler + Split no supervisado
+│   ├── 02_autoencoder_training.ipynb  # Bucle de entrenamiento PyTorch
+│   └── 03_evaluation_and_threshold.ipynb # Curvas PR-AUC / ROC, selección de τ y métricas
+├── src/
+│   ├── dataset.py                     # DataLoader PyTorch
+│   ├── model.py                       # Encoder, Decoder & Autoencoder Modules
+│   └── utils.py                       # Visualización y cálculo de MSE
+├── models/best_autoencoder.pth        # Pesos guardados
+└── requirements.txt
+🚀 4. Workflow de EjecuciónPreprocesamiento (notebooks/01_...):Escalado de Amount y Time con RobustScaler (variables PCA V1-V28 estandarizadas).Train: 100% transacciones normales ($\text{Class} = 0$).Val/Test: Muestras normales residuales + 50%/50% de las anomalías ($\text{Class} = 1$).Entrenamiento (notebooks/02_...):Minimización de $\mathcal{L}_{\text{MSE}}$ sobre datos normales con EarlyStopping.Evaluación y Umbral (notebooks/03_...):Generación de densidad de errores (KDE) para ambas clases.Optimización del umbral $\tau$ maximizando el $F_1\text{-Score}$ en la curva Precision-Recall.
